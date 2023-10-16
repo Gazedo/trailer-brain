@@ -3,93 +3,153 @@ import { Button, VerticalBox  , HorizontalBox, GridBox} from "std-widgets.slint"
 component LightButton inherits Button {
     in-out property <bool> light;
     checked: light;
+    // width: 25%;
     clicked => {
         light = !light
     }
-    
+}
+component PageButton inherits Button {
+    in-out property <int> page;
+    in-out property <int> page-idx;
+    checked: page == page-idx? true:false;
+    width:40px;
+    clicked => {
+        page-idx = page
+    }
 }
 component FuelGauge inherits Rectangle {
     in property <float> value: 0.832423423;
     in property <color> colgauge: yellow;
-    border-radius: 5px;
     background: #000000ab;
     Rectangle {
-        height: root.height*(1-root.value);
-        y:root.y;
-        background: root.background;
+        height: parent.height*(1-parent.value);
+        y:parent.y;
+        background: parent.background;
         border-color: self.background.darker(20%);
     }
     Rectangle {
-        height: root.height * root.value;
-        y: (root.height * (1-root.value));
-        background: root.colgauge;
+        height: parent.height * parent.value;
+        y: (parent.height * (1-parent.value));
+        background: parent.colgauge;
         border-color: self.background.darker(20%);
     }
     Text {
-        in property <int> clean_val: value * 100;
+        in property <int> clean_val: round(value * 100);
         text: "\{self.clean_val}%";
         color: red;
     }
 }
 component Orientation{
-    in property <angle> angle: 10deg;
-    in property <image> source: @image-url("./images/trailer-rear.svg");
+    in property <string> axis: "Roll";
+    in property <angle> angle: -10deg;
     Rectangle {
-        background: root.angle < 2.5deg?#34784b: #913942;
-        width: 100%;
+        background: abs(root.angle / 1deg) < 2.5?#34784b: #913942;
+        // width: 100%;
         height: 100%;
+        border-radius: 5px;
     }
-    Path {
-        width: 100%;
-        height: 100%;
-        stroke: #c5d2de;
-        stroke-width: 1px;
-        MoveTo{
-            x:0;
-            y:0.5/1px * root.height;
-        }
-        LineTo{
-            x:root.width/1px;
-            y:0.5/1px * root.height;
-        }
-
-    }
-    Image{
-        source: root.source;
-        // rotation-angle: root.angle;
-        width: 30%;
+    Text {
+        text: " \{axis}:\{round(angle/1deg * 100)/100}";
     }
 }
-export component AppWindow inherits Window {
-    width: 480px;
-    height: 320px;
-    in-out property<float> battery-percentage: 0.42;
-    in-out property<float> battery-temperature: 25;
-    in-out property<float> battery-amp: 42;
-    in-out property<float> water-percentage: 0.82;
-    in-out property<bool> output-pump;
-    in-out property<bool> output-fridge;
+component Page {
+    Rectangle {
+        // background: blue;
+        // clip:true;
+        // x:parent.x;
+        // y:parent.y;
+        @children
+    }
+}
+component BatteryPage inherits Page {
+    in property <float> battery-percentage: 1234%;
+    in property<float> battery-temperature: 25.1241;
+    in property<float> battery-amp: 42.9786;
+    GridBox {
+    // visible:false;
+    // Row {
+    //     Button {
+    //         icon: @image-url("./images/back.svg");
+    //         height:50px;
+    //         width: 125px;
+    //         colspan: 1;
+            
+    //     }
+    //     Text{
+    //         colspan: 3;
+    //         text: "Renogy Battery Info";
+    //         vertical-alignment: center;
+    //         horizontal-alignment: center;
+    //         font-size: 20px;
+    //     }
+    // }
+    FuelGauge {
+        row:0;
+        colspan: 2;
+        rowspan: 3;
+        // width: 240px;
+    }
+    VerticalLayout {
+        spacing: 5px;
+        row:0;
+        col:2;
+        colspan: 2;
+        rowspan:3;
+        // width: 240px;
+        Text{
+            in property <int> clean_val: round(battery-percentage * 100);
+            text:"Battery SOC \{self.clean-val}";
+        }
+        Text{
+            text:"Battery Amperage";
+        }
+        Text{
+            text:"Battery Temperature";
+        }
+        Text{
+            text:"Battery Info";
+        }
+    }
+}
+}
+
+component HomePage{
+    in property <float> battery-percentage;
+    in property <float> water-percentage;
     in-out property <bool> output-kitchen;
     in-out property <bool> output-rear;
-    in-out property <bool> output-awning;
-    in-out property <angle> imu-roll:10deg;
-    in-out property <angle> imu-pitch:1deg;
-    callback send-light-message();
-    GridBox {
-        spacing: 2px;
+    in-out property <bool> output-water;
+    in-out property <bool> output-fridge;
+    in property <angle> imu-roll;
+    in property <angle> imu-pitch;
+    mainpane := GridLayout {
+        // x:0;
+        // y:0;
+        // alignment: stretch;
+        spacing: 3px;
+        
+        // padding: -3px;
+        // HorizontalLayout {
         Row {
+            // spacing: mainpane.spacing;
             FuelGauge {
+                row:0;
+                col:0;
                 colspan: 2;
                 value <=> battery-percentage;
             }
             FuelGauge {
+                row:0;
                 col:2;
                 colspan: 2;
                 value <=> water-percentage;
                 colgauge: blue;
             }
         }
+        // HorizontalLayout {
         Row {
+        //     spacing: mainpane.spacing;
+        // alignment: stretch;
             LightButton {
                 text: "Kitchen Light";
                 light <=> root.output-kitchen;
@@ -99,25 +159,151 @@ export component AppWindow inherits Window {
                 light <=> root.output-rear;
             }
             LightButton {
-                text: "Water Pump";
-                light <=> root.output-pump;
+                text: "Pump";
+                light <=> root.output-water;
             }
             LightButton {
                 text: "Fridge";
                 light <=> root.output-fridge;
             }
         }
-        Row{
+        Row {
+            // spacing: mainpane.spacing;
             Orientation {
+                row:2;
+                col:0;
                 colspan: 2;
                 angle<=> imu-roll;
+                axis: "Roll";
             }
             Orientation {
+                row:2;
                 col:2;
                 colspan: 2;
                 angle<=> imu-pitch;
-                source: @image-url("./images/trailer-side.svg");
+                axis: "Pitch";
             }
         }
-     }
+    }
+
+    // GridBox {
+    //     spacing: 3px;
+    //     padding: 2px;
+    //     visible: true;
+    //     Row {
+    //         FuelGauge {
+    //             colspan: 2;
+    //             value <=> battery-percentage;
+    //         }
+    //         FuelGauge {
+    //             col:2;
+    //             colspan: 2;
+    //             value <=> water-percentage;
+    //             colgauge: blue;
+    //         }
+    //     }
+    //     Row {
+
+    //         LightButton {
+    //             text: "Kitchen Light";
+    //             light <=> root.output-kitchen;
+    //         }
+    //         LightButton {
+    //             text: "Rear Light";
+    //             light <=> root.output-rear;
+    //         }
+    //         LightButton {
+    //             text: "Water Pump";
+    //             light <=> root.output-water;
+    //         }
+    //         LightButton {
+    //             text: "Fridge";
+    //             light <=> root.output-fridge;
+    //         }
+    //     }
+    //     Row{
+    //         Orientation {
+    //             colspan: 2;
+    //             angle<=> imu-roll;
+    //         }
+    //         Orientation {
+    //             col:2;
+    //             colspan: 2;
+    //             angle<=> imu-pitch;
+    //             source: @image-url("./images/trailer-side.svg");
+    //         }
+    //     }
+    //  }
+}
+
+export component AppWindow inherits Window {
+    width: 320px;
+    height: 240px;
+    in property<float> battery-percentage: 0.426432;
+    in property<float> battery-temperature: 25.1241;
+    in property<float> battery-amp: 42.9786;
+    in property<float> water-percentage: 0.822345;
+    in-out property<bool> output-water;
+    in-out property<bool> output-fridge;
+    in-out property <bool> output-kitchen;
+    in-out property <bool> output-rear;
+    in-out property <bool> output-awning;
+    in-out property <angle> imu-roll:-10.53deg;
+    in-out property <angle> imu-pitch:1.005deg;
+    callback send-light-message();
+
+    in-out property <int> page-index:1;
+    HorizontalLayout {
+        VerticalLayout {
+            alignment:stretch;
+            spacing: 1px;
+            // width: 40px;
+            PageButton {
+                page: 1;
+                page-idx <=> page-index;
+                // icon: @image-url("./images/home.svg");
+            }
+            PageButton {
+                page: 2;
+                page-idx <=> page-index;
+                // icon: @image-url("./images/bulb.svg");
+            }
+            PageButton {
+                page: 3;
+                page-idx <=> page-index;
+                // icon: @image-url("./images/battery.svg");
+            }
+            PageButton {
+                page: 4;
+                page-idx <=> page-index;
+                // icon: @image-url("./images/trailer-side.svg");
+            }
+        }
+        Rectangle {
+            // background: white;
+            width: 280px;
+            height: 240px;
+            // width: 100%;
+            // height: 100%;
+            // width: 80%;
+            // height: 240px;
+            bp := BatteryPage {
+                // visible: true;
+                visible: page-index == 3? true:false;
+            }
+            hp:= HomePage {
+                width: 100%;
+                height: 100%;
+                battery-percentage  <=> battery-percentage;
+                water-percentage  <=> water-percentage;
+                output-fridge <=> output-fridge;
+                output-rear <=> output-rear;
+                output-water <=> output-water;
+                output-kitchen <=> output-kitchen;
+                imu-roll <=> imu-roll;
+                imu-pitch <=> imu-pitch;
+                visible: page-index == 1? true:false;
+            }
+        }
+    }
 }
