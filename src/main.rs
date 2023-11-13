@@ -22,10 +22,6 @@ mod pico_slint;
 
 slint::include_modules!();
 
-
-// Static Display Buffer
-// 153600 bytes or 153.6 KB
-// 110.4 KB left
 const _DIS_HEIGHT:usize = 320;
 const DIS_WIDTH:usize = 480;
 
@@ -155,7 +151,6 @@ fn main() -> ! {
     loop{
         slint::platform::update_timers_and_animations();
         window.draw_if_needed(|render| {
-            // type TargetPixel = Rgb666;
             // Will also send pixels to the display and increment the buffer location
             render.render_by_line(&mut display);
         });

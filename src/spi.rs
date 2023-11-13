@@ -14,7 +14,7 @@ use rp_pico::hal::dma::{single_buffer::{Config, Transfer}, SingleChannel, WriteT
 use slint::{platform::software_renderer::LineBufferProvider, Rgb8Pixel};
 
 use embedded_hal::blocking::delay::DelayUs;
-use crate::{spi::dcs::{EnterNormalMode, ExitSleepMode, PixelFormat, SetAddressMode, SetDisplayOn, SetPixelFormat}, DIS_WIDTH};
+use crate::{spi::dcs::{EnterNormalMode, ExitSleepMode, PixelFormat, SetAddressMode, SetDisplayOn, SetPixelFormat, Dcs}, DIS_WIDTH};
 
 mod dcs;
 mod options;
@@ -84,9 +84,6 @@ where
             self.di = Some(dcs.release())
         }
     }
-    // pub fn get_buf(&mut self) -> &mut [Pix666]{
-    //     &mut self.buf
-    // }
     pub fn write_cur_buf(&mut self, range:core::ops::Range<usize>, line:usize){
         let (sx, ex) = (range.start, range.end);
         let sy = line;
@@ -124,17 +121,9 @@ where
     let madctl = SetAddressMode::default()
         .with_color_order(options::ColorOrder::Bgr)
         .with_orientation(options::Orientation::Landscape(false));
-    // let madctl = SetAddressMode::new(
-    //     options::ColorOrder::Bgr,
-    //     options::Orientation::Landscape(true),
-    //     RefreshOrder::new(
-    //         VerticalRefreshOrder::TopToBottom,
-    //         HorizontalRefreshOrder::LeftToRight)
-    //     );
     let pixel_format = PixelFormat::with_all(
         dcs::BitsPerPixel::TwentyFour
     );
-    // let madctl = SetAddressMode::from(options);
     info!("Exitting sleep mode");
     dcs.write_command(ExitSleepMode)?; // turn off sleep
     info!("Setting pixel format");
