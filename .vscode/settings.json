@@ -1,7 +1,4 @@
 {
     "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
-    "rust-analyzer.cargo.features": [
-        "pico",
-    ],
     "svg.preview.background": "dark-transparent",
 }

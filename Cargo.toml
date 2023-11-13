@@ -11,47 +11,28 @@ build = "build.rs"
 [dependencies]
 slint = { version = "1.0.0", default-features = false, features = [
     "compat-1-0",
+    "unsafe-single-threaded",
+    "libm",
 ] }
 
 # for the rp-pico, replace by the hal for your crate
-panic-halt = { version = "0.2.0", optional = true }
-panic-probe = { version = "0.3.1", features = ["print-defmt"], optional = true }
-rp-pico = { version = "0.8", optional = true }
-cortex-m = { version = "0.7.6", optional = true }
-cortex-m-rt = { version = "0.7.1", optional = true }
-embedded-alloc = { version = "0.5", optional = true }
-mipidsi = { version = "0.7.1", optional = true }
-shared-bus = { version = "0.3.0", optional = true }
-display-interface-spi = { version = "0.4.1", optional = true }
-embedded-graphics-core = { version = "0.4.0", optional = true }
-embedded-hal = { version = "0.2.7", optional = true }
-fugit = { version = "0.3.6", optional = true }
-crossbeam-queue = { version = "0.3", default-features = false, optional = true }
-defmt = { version = "0.3", optional = true }
-defmt-rtt = { version = "0.4", optional = true }
+panic-halt = { version = "0.2.0" }
+panic-probe = { version = "0.3.1", features = ["print-defmt"] }
+rp-pico = { version = "0.8" }
+cortex-m = { version = "0.7.6" }
+cortex-m-rt = { version = "0.7.1" }
+embedded-alloc = { version = "0.5" }
+embedded-dma = { version = "0.2.0" }
+euclid = { version = "0.22", default-features = false }
+mipidsi = { version = "0.7.1" }
+shared-bus = { version = "0.3.0", features=["cortex-m"]}
+display-interface = { version = "0.4.1" }
+embedded-graphics-core = { version = "0.4.0" }
+embedded-hal = { version = "0.2.7" }
+fugit = { version = "0.3.6" }
+crossbeam-queue = { version = "0.3", default-features = false }
+defmt = { version = "0.3" }
+defmt-rtt = { version = "0.4" }
 
 [build-dependencies]
 slint-build = { version = "1.0.0" }
-
-
-[features]
-simulator = ["slint/renderer-winit-software", "slint/backend-winit"]
-pico = [
-    "slint/unsafe-single-threaded",
-    "slint/libm",
-    "crossbeam-queue",
-    "rp-pico",
-    "cortex-m",
-    "cortex-m-rt",
-    "embedded-alloc",
-    "embedded-hal",
-    "fugit",
-    "mipidsi",
-    "display-interface-spi",
-    "embedded-graphics-core",
-    "shared-bus",
-    "panic-halt",
-    "panic-probe",
-    "defmt",
-    "defmt-rtt",
-]
