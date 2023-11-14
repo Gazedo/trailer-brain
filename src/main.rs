@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use cortex_m::singleton;
 
+use embedded_graphics_core::{pixelcolor::Rgb666, prelude::RgbColor};
 use embedded_hal::digital::v2::OutputPin;
 // Debug and panic stuff
 use panic_halt as _;
@@ -73,7 +74,7 @@ fn main() -> ! {
     .ok()
     .unwrap();
     unsafe { ALLOCATOR.init(&mut HEAP as *const u8 as usize, core::mem::size_of_val(&HEAP)) }
-    let delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let pins = rp_pico::Pins::new(pac.IO_BANK0, pac.PADS_BANK0, sio.gpio_bank0, &mut pac.RESETS);
     let timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
     
@@ -108,7 +109,8 @@ fn main() -> ! {
     info!("Setting up Display");
     let mut bl = pins.gpio6.into_push_pull_output_in_state(PinState::High);
     bl.set_high().unwrap();
-    let rst = pins.gpio14.into_push_pull_output();
+    let mut rst = pins.gpio14.into_push_pull_output();
+    rst.set_high().unwrap();
     let dc = pins.gpio16.into_push_pull_output();
     let dma = pac.DMA.split(&mut pac.RESETS);
     let write_buf = singleton!(: [Pix666; DIS_WIDTH] = [Pix666::default(); DIS_WIDTH]).unwrap();
@@ -123,7 +125,9 @@ fn main() -> ! {
     //     .with_framebuffer_size(DIS_WIDTH as u16, DIS_HEIGHT as u16)
     //     .init(&mut delay, Some(rst))
     //     .unwrap();
-    let mut display = ILI9488::new(di, rst, delay);
+    delay.delay_us(100);
+    let mut display = ILI9488::new(di, rst, &mut delay);
+    // display.clear(Rgb666::BLACK).unwrap();
     
     info!("Set up DMA to display");
     

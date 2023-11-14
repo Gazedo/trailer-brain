@@ -65,9 +65,7 @@ where
     /// Sends a DCS command to the display interface.
     pub fn write_command(&mut self, command: impl DcsCommand) -> Result<(), DisplayError> {
         let mut param_bytes: [u8; 16] = [0; 16];
-        info!("Filling in command bytes");
         let n = command.fill_params_buf(&mut param_bytes)?;
-        info!("Writing raw to spi bus");
         self.write_raw(command.instruction(), &param_bytes[..n])
     }
 

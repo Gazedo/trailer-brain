@@ -5,16 +5,23 @@ use core::{u8, mem};
 
 use cortex_m::delay::Delay;
 use defmt::{info, debug, error};
+use embedded_graphics_core::prelude::{DrawTarget, Point, OriginDimensions, Size};
+use embedded_graphics_core::Pixel;
+use embedded_graphics_core::primitives::Rectangle;
+// use embedded_graphics_core::{prelude::{Point, Size, DrawTarget}, pixelcolor::Rgb666};
 use embedded_hal as hal;
 use hal::{digital::v2::OutputPin, spi::FullDuplex};
 use embedded_hal::blocking::spi;
 
 use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
+use mipidsi::error;
 use rp_pico::hal::dma::{single_buffer::{Config, Transfer}, SingleChannel, WriteTarget, Pace};
 use slint::{platform::software_renderer::LineBufferProvider, Rgb8Pixel};
 
 use embedded_hal::blocking::delay::DelayUs;
-use crate::{spi::dcs::{EnterNormalMode, ExitSleepMode, PixelFormat, SetAddressMode, SetDisplayOn, SetPixelFormat, Dcs}, DIS_WIDTH};
+use crate::{spi::{dcs::{EnterNormalMode, ExitSleepMode, PixelFormat, SetAddressMode, SetDisplayOn, SetPixelFormat, Dcs}, options::{ModelOptions, Orientation, ColorOrder}}, DIS_WIDTH};
+
+use self::dcs::WriteMemoryStart;
 
 mod dcs;
 mod options;
@@ -57,7 +64,6 @@ pub struct ILI9488<DI:DmaWriteOnlyDataCommand, RST: OutputPin>{
     rst: Option<RST>,
     // cur_buf: usize,
     buf: [Pix666; DIS_WIDTH],
-    delay: Delay,
     // bufs: Vec<Ili9488Buf>,
     // dcs: Dcs<DI>
 }
@@ -68,17 +74,17 @@ where
     RST: OutputPin
     // Dcs<DI>: DcsCommand
 {
-    pub fn new(di:DI, rst:RST, delay: Delay) -> Self {
-        let mut ili = Self {di:Some(di), delay, rst:Some(rst), buf: [Pix666::default();DIS_WIDTH] };
-        ili.init_screen();
+    pub fn new(di:DI, rst:RST, mut delay: &mut Delay) -> Self {
+        let mut ili = Self {di:Some(di), rst:Some(rst), buf: [Pix666::default();DIS_WIDTH] };
+        ili.init_screen(&mut delay);
         ili
     }
-    fn init_screen(&mut self) {
+    fn init_screen(&mut self, delay: &mut Delay) {
         if let Some(di) = self.di.take(){
             let mut dcs = Dcs::write_only(di);
-            self.hard_reset();
+            self.hard_reset(delay);
             info!("Initting the common display");
-            init_common(&mut dcs, &mut self.delay).unwrap();
+            init_common(&mut dcs, delay).unwrap();
             
             info!("Success! Releasing dcs");
             self.di = Some(dcs.release())
@@ -89,7 +95,10 @@ where
         let sy = line;
         self.set_address_window(sx, sy, ex, sy);
         if let Some(mut di) = self.di.take(){
-            di.write_partial_data(&mut self.buf, range).unwrap()
+            di.write_partial_data(&mut self.buf, range).unwrap();
+            self.di = Some(di);
+        } else {
+            error!("Couldn't get di");
         }
 
     }
@@ -99,12 +108,14 @@ where
             let mut dcs = Dcs::write_only(di);
             dcs.write_command(dcs::SetColumnAddress::new(sx as u16, ex as u16)).unwrap();
             dcs.write_command(dcs::SetPageAddress::new(sy as u16, ey as u16)).unwrap();
+            dcs.write_command(WriteMemoryStart).unwrap();
+            self.di = Some(dcs.release());
         }
     }
-    fn hard_reset(&mut self){
+    fn hard_reset(&mut self, delay:&mut Delay){
         if let Some(mut rst) = mem::take(&mut self.rst){
             let _ = rst.set_low();
-            self.delay.delay_us(10);
+            delay.delay_us(10);
             let _ = rst.set_high();
             self.rst = Some(rst);
         }
@@ -118,12 +129,16 @@ where
     DELAY: DelayUs<u32>,
     DI: WriteOnlyDataCommand,
 {
-    let madctl = SetAddressMode::default()
-        .with_color_order(options::ColorOrder::Bgr)
-        .with_orientation(options::Orientation::Landscape(false));
+    // let madctl = SetAddressMode::default()
+    //     .with_color_order(options::ColorOrder::Bgr)
+    //     .with_orientation(options::Orientation::Landscape(false));
     let pixel_format = PixelFormat::with_all(
-        dcs::BitsPerPixel::TwentyFour
+        dcs::BitsPerPixel::Eighteen
     );
+    let mut options = ModelOptions::with_sizes((320, 480), (320, 480));
+    options.orientation = Orientation::LandscapeInverted(false);
+    options.color_order = ColorOrder::Bgr;
+    let madctl = SetAddressMode::from(&options);
     info!("Exitting sleep mode");
     dcs.write_command(ExitSleepMode)?; // turn off sleep
     info!("Setting pixel format");
@@ -195,7 +210,10 @@ where
             panic!("DMA Doesn't hold expected data");
         };
         self.dc.set_high().map_err(|_| DisplayError::DCError)?;
-        core::mem::swap(dis_buf, buf);
+        // core::mem::swap(dis_buf, buf);
+        for i in range.clone() {
+            buf[i] = Pix666::from([dis_buf[i].r.to_be(), dis_buf[i].g.to_be(), dis_buf[i].b.to_be()]);
+        }
         let mut pio = Config::new(ch, PartialReadBuffer(buf, range), spi);
         pio.pace(Pace::PreferSink);
         self.dma = Some(DMATransfer::Running(pio.start()));
@@ -211,45 +229,38 @@ DC: OutputPin
 {
     fn send_commands(&mut self, cmds: DataFormat<'_>) -> Result<(), DisplayError> {
         // 1 = data, 0 = command
-        info!("Setting dcs low");
         self.dc.set_low().map_err(|_| DisplayError::DCError)?;
 
-        info!("Getting spi bus from dma");
         let (ch, b, mut spi) = if let Some(dma) = mem::take(&mut self.dma){
             dma.wait()
         } else {
             panic!("DMA Doesn't hold expected data");
         };
-        info!("Sending command u8's over bus");
         let e = send_u8(&mut spi, cmds);
-        match e.clone(){
-            Ok(_) => info!("Succeeded in writing commands"),
-            Err(e) => match e {
-                DisplayError::InvalidFormatError => error!("Invalid Format"),
-                DisplayError::BusWriteError => error!("Bus write"),
-                DisplayError::DCError => error!("DC Error"),
-                DisplayError::CSError => error!("CS Error"),
-                DisplayError::DataFormatNotImplemented => error!("Data format not implemented"),
-                DisplayError::RSError => error!("RS Error"),
-                DisplayError::OutOfBoundsError => error!("Out of Bounds"),
-                _ => todo!(),
-            }
-        }
-        info!("Restoring spi with dma, current value is {:?}", if self.dma.is_none(){"None"} else{"Not None"});
+        // match e.clone(){
+        //     Ok(_) => info!("Succeeded in writing commands"),
+        //     Err(e) => match e {
+        //         DisplayError::InvalidFormatError => error!("Invalid Format"),
+        //         DisplayError::BusWriteError => error!("Bus write"),
+        //         DisplayError::DCError => error!("DC Error"),
+        //         DisplayError::CSError => error!("CS Error"),
+        //         DisplayError::DataFormatNotImplemented => error!("Data format not implemented"),
+        //         DisplayError::RSError => error!("RS Error"),
+        //         DisplayError::OutOfBoundsError => error!("Out of Bounds"),
+        //         _ => todo!(),
+        //     }
+        // }
         self.dma = Some(DMATransfer::Idle(ch, b, spi));
         e
     }
     fn send_data(&mut self, buf: DataFormat<'_>) -> Result<(), DisplayError> {
         // 1 = data, 0 = command
-        info!("Setting dcs high");
         self.dc.set_high().map_err(|_| DisplayError::DCError)?;
-        info!("Getting spi bus from dma");
         let (ch, b, mut spi) = if let Some(dma) = mem::take(&mut self.dma){
             dma.wait()
         } else {
             panic!("DMA Doesn't hold expected data");
         };
-        info!("Sending data u8's over bus");
         let e = send_u8(&mut spi, buf);
         let _ = self.dma.insert(DMATransfer::Idle(ch, b, spi));
         e
@@ -299,3 +310,94 @@ fn send_u8<SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocki
         _ => Err(DisplayError::DataFormatNotImplemented),
     }
 }
+// impl<DI, RST> OriginDimensions for ILI9488<DI, RST>
+// where
+//     DI: WriteOnlyDataCommand + DmaWriteOnlyDataCommand,
+//     RST: OutputPin,
+// {
+//     fn size(&self) -> Size {
+//         self.dis_size
+//     }
+// }
+
+
+// impl<DI,RST> DrawTarget for ILI9488<DI, RST>
+// where
+//     DI: WriteOnlyDataCommand + DmaWriteOnlyDataCommand,
+//     RST: OutputPin,
+// {
+//     type Error = DisplayError;
+
+//     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+//     where
+//         I: IntoIterator<Item = Pixel<Self::Color>>,
+//     {
+
+//         for pixel in pixels {
+//             let x = pixel.0.x as u16;
+//             let y = pixel.0.y as u16;
+
+//             self.set_pixel(x, y, pixel.1)?;
+//         }
+
+//         Ok(())
+//     }
+//     fn fill_contiguous<I>(&mut self, area: &Rectangle, colors: I) -> Result<(), Self::Error>
+//     where
+//         I: IntoIterator<Item = Self::Color>,
+//     {
+//         if let Some(bottom_right) = area.bottom_right() {
+//             let mut count = 0u32;
+//             let max = area.size.width * area.size.height;
+
+//             let mut colors = colors.into_iter().take_while(|_| {
+//                 count += 1;
+//                 count <= max
+//             });
+
+//             let sx = area.top_left.x as u16;
+//             let sy = area.top_left.y as u16;
+//             let ex = bottom_right.x as u16;
+//             let ey = bottom_right.y as u16;
+//             self.set_pixels(sx, sy, ex, ey, &mut colors)
+//         } else {
+//             // nothing to draw
+//             Ok(())
+//         }
+//     }
+
+//     fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+//         let fb_size = self.options.framebuffer_size();
+//         let fb_rect = Rectangle::with_corners(
+//             Point::new(0, 0),
+//             Point::new(fb_size.0 as i32 - 1, fb_size.1 as i32 - 1),
+//         );
+//         let area = area.intersection(&fb_rect);
+
+//         if let Some(bottom_right) = area.bottom_right() {
+//             let mut count = 0u32;
+//             let max = area.size.width * area.size.height;
+
+//             let mut colors = core::iter::repeat(color).take_while(|_| {
+//                 count += 1;
+//                 count <= max
+//             });
+
+//             let sx = area.top_left.x as u16;
+//             let sy = area.top_left.y as u16;
+//             let ex = bottom_right.x as u16;
+//             let ey = bottom_right.y as u16;
+//             self.set_pixels(sx, sy, ex, ey, &mut colors)
+//         } else {
+//             // nothing to draw
+//             Ok(())
+//         }
+//     }
+
+//     fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
+//         let fb_size = self.options.framebuffer_size();
+//         let pixel_count = usize::from(fb_size.0) * usize::from(fb_size.1);
+//         let colors = core::iter::repeat(color).take(pixel_count); // blank entire HW RAM contents
+//         self.set_pixels(0, 0, fb_size.0 - 1, fb_size.1 - 1, colors)
+//     }
+// }
