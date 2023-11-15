@@ -166,7 +166,7 @@ fn main() -> ! {
             .unwrap()
             .map(|point| {
                 let position =
-                    slint::PhysicalPosition::new((point.0 * 320.) as _, (point.1 * 240.) as _)
+                    slint::PhysicalPosition::new((point.0 * 480.) as _, (point.1 * 320.) as _)
                         .to_logical(window.scale_factor());
                 match last_touch.replace(position) {
                     Some(_) => WindowEvent::PointerMoved { position },

@@ -63,7 +63,7 @@ impl<PinE, IRQ: InputPin<Error = PinE>, CS: OutputPin<Error = PinE>, SPI: Transf
             for _ in 0..10 {
                 let y = xchg!(CMD_Y_READ);
                 let x = xchg!(CMD_X_READ);
-                point.0 += i16::MAX as u32 - x;
+                point.0 += x;
                 point.1 += y;
             }
 
@@ -81,7 +81,11 @@ impl<PinE, IRQ: InputPin<Error = PinE>, CS: OutputPin<Error = PinE>, SPI: Transf
             point.0 /= 10;
             point.1 /= 10;
             self.pressed = true;
-            info!("Got Touch {:?}, {:?}", point.0, point.1);
+            // let ret = (
+            //     point.0.saturating_sub(MIN_X) as f32 / (MAX_X - MIN_X) as f32,
+            //     point.1.saturating_sub(MIN_Y) as f32 / (MAX_Y - MIN_Y) as f32,
+            // );
+            // info!("Got Touch {:?}, {:?} which is {}/[{} {}] x {}/[{} {}]", ret.0, ret.1, point.0, MIN_X, MAX_X, point.1, MIN_Y,MAX_Y);
             Ok(Some((
                 point.0.saturating_sub(MIN_X) as f32 / (MAX_X - MIN_X) as f32,
                 point.1.saturating_sub(MIN_Y) as f32 / (MAX_Y - MIN_Y) as f32,
