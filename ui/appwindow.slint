@@ -5,13 +5,13 @@ component LightButton inherits Rectangle {
     in-out property text <=> txt.text;
     // : light;
     callback pressed <=> touch.clicked;
-    border-radius: root.height / 2;
+    border-radius: 6px;
     border-width: 1px;
     border-color: root.background.darker(25%);
     // background: touch.pressed ? #6b8282 : touch.has-hover ? #6c616c :  #456;
     background: light ? #c7d8d8 : #7b261b;
-    height: txt.preferred-height * 1.33;
-    min-width: txt.preferred-width + 20px;
+    // height: 100px;
+    // min-width: 0px;
     txt := Text {
         x: (parent.width - self.width)/2 + (touch.pressed ? 2px : 0);
         y: (parent.height - self.height)/2 + (touch.pressed ? 1px : 0);
@@ -142,15 +142,8 @@ component HomePage{
     in property <angle> imu-roll;
     in property <angle> imu-pitch;
     mainpane := GridLayout {
-        // x:0;
-        // y:0;
-        // alignment: stretch;
         spacing: 3px;
-        
-        // padding: -3px;
-        // HorizontalLayout {
         Row {
-            // spacing: mainpane.spacing;
             FuelGauge {
                 row:0;
                 col:0;
@@ -165,11 +158,9 @@ component HomePage{
                 colgauge: blue;
             }
         }
-        // HorizontalLayout {
         Row {
-        //     spacing: mainpane.spacing;
-        // alignment: stretch;
             LightButton {
+                max-height: 0.33 * mainpane.height;
                 text: "Kitchen Light";
                 light <=> root.output-kitchen;
             }
