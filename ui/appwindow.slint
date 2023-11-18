@@ -1,17 +1,23 @@
 import { Button, VerticalBox  , HorizontalBox, GridBox} from "std-widgets.slint";
 
+export enum Output{
+    Kitchen,
+    Stove,
+    Fridge,
+    Water
+}
+export global Logic {
+    callback send_toggle(Output, bool);
+}
 component LightButton inherits Rectangle {
     in-out property <bool> light;
+    in property <Output> name;
     in-out property text <=> txt.text;
-    // : light;
     callback pressed <=> touch.clicked;
     border-radius: 6px;
     border-width: 1px;
     border-color: root.background.darker(25%);
-    // background: touch.pressed ? #6b8282 : touch.has-hover ? #6c616c :  #456;
     background: light ? #c7d8d8 : #7b261b;
-    // height: 100px;
-    // min-width: 0px;
     txt := Text {
         x: (parent.width - self.width)/2 + (touch.pressed ? 2px : 0);
         y: (parent.height - self.height)/2 + (touch.pressed ? 1px : 0);
@@ -19,7 +25,8 @@ component LightButton inherits Rectangle {
     }
     touch := TouchArea {
         clicked => {
-            root.light = !root.light
+            root.light = !root.light;
+            Logic.send-toggle(name,  light);
         }
     }
     // width: 25%;
@@ -141,6 +148,7 @@ component HomePage{
     in-out property <bool> output-fridge;
     in property <angle> imu-roll;
     in property <angle> imu-pitch;
+    callback send_hp_toggle(Output, bool);
     mainpane := GridLayout {
         spacing: 3px;
         Row {
@@ -161,20 +169,24 @@ component HomePage{
         Row {
             LightButton {
                 max-height: 0.33 * mainpane.height;
+                name: Kitchen;
                 text: "Kitchen Light";
                 light <=> root.output-kitchen;
             }
             LightButton {
                 text: "Rear Light";
+                name: Stove;
                 light <=> root.output-rear;
             }
             LightButton {
-                text: "Pump";
-                light <=> root.output-water;
+                text: "Fridge";
+                name: Fridge;
+                light <=> root.output-fridge;
             }
             LightButton {
-                text: "Fridge";
-                light <=> root.output-fridge;
+                text: "Pump";
+                name: Water;
+                light <=> root.output-water;
             }
         }
         Row {
@@ -260,7 +272,6 @@ export component AppWindow inherits Window {
     in-out property <bool> output-awning;
     in-out property <angle> imu-roll:-10.53deg;
     in-out property <angle> imu-pitch:1.005deg;
-    callback send-light-message();
 
     in-out property <int> page-index:1;
     HorizontalLayout {

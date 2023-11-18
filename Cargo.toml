@@ -3,7 +3,7 @@ name = "trailer-brain"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
-# rust-version = "1.68"  # Because of the allocator
+rust-version = "1.68"  # Because of the allocator
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,7 +15,6 @@ slint = { version = "1.0.0", default-features = false, features = [
     "libm",
 ] }
 
-# for the rp-pico, replace by the hal for your crate
 panic-halt = { version = "0.2.0" }
 panic-probe = { version = "0.3.1", features = ["print-defmt"] }
 rp-pico = { version = "0.8" }
@@ -30,9 +29,12 @@ display-interface = { version = "0.4.1" }
 embedded-graphics-core = { version = "0.4.0" }
 embedded-hal = { version = "0.2.7" }
 fugit = { version = "0.3.6" }
-crossbeam-queue = { version = "0.3", default-features = false }
 defmt = { version = "0.3" }
 defmt-rtt = { version = "0.4" }
+heapless = { version = "0.7.16"}
+pcf857x = "0.4.0"
+lis2dh12 = { version = "0.6.9" }
+micromath = "2.1.0"
 
 [build-dependencies]
 slint-build = { version = "1.0.0" }
