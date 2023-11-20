@@ -2,8 +2,8 @@ use core::fmt::Debug;
 
 use defmt::{error, info};
 use embedded_hal::blocking::i2c::{WriteRead, Write};
-use lis2dh12::{Lis2dh12, SlaveAddr,  RawAccelerometer, I16x3};
-use micromath::{F32, F32Ext};
+use lis2dh12::{Lis2dh12, SlaveAddr,  RawAccelerometer, I16x3, Error};
+use micromath::F32Ext;
 
 static SENS:f32 = 0.002;
 
@@ -56,16 +56,17 @@ where
 I2C: WriteRead<Error = E> + Write<Error = E>,
 E: Debug
 {
-    pub fn new(i2c:I2C) -> Result<Self, ()> {
+    pub fn new(i2c:I2C) -> Result<Self, Error<E>> {
         let mut dev = match Lis2dh12::new(i2c, SlaveAddr::Default){
             Ok(dev) => dev,
             Err(e) => {
                 error!("Failed to create lisdh device");
-                return Err(());
+                return Err(e);
             }
         };
-        dev.enable_axis((true, true, true));
-        dev.
+        dev.reset().unwrap();
+        dev.enable_axis((true, true, true)).unwrap();
+        dev.set_odr(lis2dh12::Odr::Hz25).unwrap();
 
         Ok(Self{dev, prev_value:Orientation::default(), k:0.5})
     }

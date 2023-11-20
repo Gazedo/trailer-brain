@@ -27,6 +27,7 @@ use rp_pico::{
     },
     pac::{CorePeripherals, Peripherals},
 };
+use shared_bus::BusManagerCortexM;
 use slint::{
     platform::{
         software_renderer::{MinimalSoftwareWindow, RepaintBufferType},
@@ -82,9 +83,10 @@ enum UIMsg {
 static Q_CMD: Q4<UICmd> = Q4::new();
 static Q_MSG: Q4<UIMsg> = Q4::new();
 
-fn core1_task<I2C, E>(i: usize, mut delay: Delay, i2c:I2C) 
-where I2C: WriteRead<Error = E> + Write<Error = E>,
-E: Debug
+fn core1_task<I2C, E>(i: usize, mut delay: Delay, i2c:&BusManagerCortexM<I2C>) 
+where
+    I2C: WriteRead<Error = E> + Write<Error = E>,
+    E: Debug
 {
     use defmt::*;
     use defmt_rtt as _;
@@ -96,14 +98,14 @@ E: Debug
     // let mut pitch = -10.0;
     
     let address = pcf857x::SlaveAddr::Alternative(true, true, true);
-    let mut expander = Pcf8575::new(i2c, address);
+    let mut expander = Pcf8575::new(i2c.acquire_i2c(), address);
     let bits = 0xff;
     if let Err(_) = expander.set(bits){
         error!("Failed to set expander bits")
     }
     let mut pins = expander.split();
     
-    let imu = Imu::new(i2c).unwrap();
+    let mut imu = Imu::new(i2c.acquire_i2c()).unwrap();
     loop {
         // Check for commands from UI
         if let Some(new_msg) = Q_CMD.dequeue() {
@@ -256,7 +258,8 @@ fn main() -> ! {
     let sda_pin: gpio::Pin<_, gpio::FunctionI2C, gpio::PullUp> = pins.gpio4.reconfigure();
     let scl_pin: gpio::Pin<_, gpio::FunctionI2C, gpio::PullUp> = pins.gpio5.reconfigure();
     let i2c = I2C::i2c0(pac.I2C0, sda_pin, scl_pin, 400.kHz(), &mut pac.RESETS, &clocks.system_clock);
-    let i2c: shared_bus::BusManager<shared_bus::NullMutex<I2C<rp_pico::pac::I2C0, (gpio::Pin<gpio::bank0::Gpio4, gpio::FunctionI2c, gpio::PullUp>, gpio::Pin<gpio::bank0::Gpio5, gpio::FunctionI2c, gpio::PullUp>)>>> = shared_bus::BusManagerSimple::new(i2c); 
+    let i2c: &'static _ = shared_bus::new_cortexm!(I2C<rp_pico::pac::I2C0, (gpio::Pin<gpio::bank0::Gpio4, gpio::FunctionI2c, gpio::PullUp>, gpio::Pin<gpio::bank0::Gpio5, gpio::FunctionI2c, gpio::PullUp>)> = i2c).unwrap();
+    // let i2c = shared_bus::CortexMMutex::new(i2c); 
 
     info!("Setting up Display");
     let mut bl = pins.gpio6.into_push_pull_output_in_state(PinState::High);
