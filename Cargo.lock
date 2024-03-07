@@ -1191,6 +1191,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ieee754"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9007da9cacbd3e6343da136e98b0d2df013f553d35bdec8b518f07bea768e19c"
+
+[[package]]
 name = "image"
 version = "0.24.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2036,6 +2042,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmodbus"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1ab9d19450d29b6b4d14034360f6f1374b060ed584c60f4b96352b733b1c78"
+dependencies = [
+ "ieee754",
+]
+
+[[package]]
 name = "rowan"
 version = "0.15.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2624,6 +2639,7 @@ dependencies = [
  "panic-halt",
  "panic-probe",
  "pcf857x",
+ "rmodbus",
  "rp-pico",
  "shared-bus",
  "slint",

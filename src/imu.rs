@@ -4,6 +4,7 @@ use defmt::{error, info};
 use embedded_hal::blocking::i2c::{WriteRead, Write};
 use lis2dh12::{Lis2dh12, SlaveAddr,  RawAccelerometer, I16x3, Error};
 use micromath::F32Ext;
+use rp_pico::hal::i2c::Error;
 
 static SENS:f32 = 0.002;
 
@@ -57,10 +58,14 @@ I2C: WriteRead<Error = E> + Write<Error = E>,
 E: Debug
 {
     pub fn new(i2c:I2C) -> Result<Self, Error<E>> {
-        let mut dev = match Lis2dh12::new(i2c, SlaveAddr::Default){
+        let mut dev = match Lis2dh12::new(i2c, SlaveAddr::Alternative(false)){
             Ok(dev) => dev,
             Err(e) => {
                 error!("Failed to create lisdh device");
+                match e{
+                    Lis2dh12::Error => error!("Error in lisdh device"),
+                    Error => error!("Error in i2c bus")
+                }
                 return Err(e);
             }
         };

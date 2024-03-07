@@ -23,7 +23,7 @@ use rp_pico::{
         gpio,
         gpio::PinState,
         multicore::{Multicore, Stack},
-        Clock, Sio, Spi, Timer, Watchdog, I2C,
+        Clock, Sio, Spi, Timer, Watchdog, I2C, uart::{UartPeripheral, UartConfig, DataBits, StopBits},
     },
     pac::{CorePeripherals, Peripherals},
 };
@@ -38,11 +38,12 @@ use slint::{
 
 use crate::{
     pico_slint::PicoPlatform,
-    spi::{DMATransfer, Pix666, SPIInterfaceNoCSDma, ILI9488}, imu::Imu,
+    spi::{DMATransfer, Pix666, SPIInterfaceNoCSDma, ILI9488},
 };
 
-mod imu;
+// mod imu;
 mod pico_slint;
+mod renogy;
 mod spi;
 mod xpt2046;
 
@@ -83,7 +84,7 @@ enum UIMsg {
 static Q_CMD: Q4<UICmd> = Q4::new();
 static Q_MSG: Q4<UIMsg> = Q4::new();
 
-fn core1_task<I2C, E>(i: usize, mut delay: Delay, i2c:&BusManagerCortexM<I2C>) 
+fn core1_task<I2C, UART, E>(i: usize, mut delay: Delay, i2c:&BusManagerCortexM<I2C>, uart:UART) 
 where
     I2C: WriteRead<Error = E> + Write<Error = E>,
     E: Debug
@@ -105,7 +106,8 @@ where
     }
     let mut pins = expander.split();
     
-    let mut imu = Imu::new(i2c.acquire_i2c()).unwrap();
+    // let mut imu = Imu::new(i2c.acquire_i2c()).unwrap();
+    let bat = renogy::SmartBattery::new(uart, 0x30);
     loop {
         // Check for commands from UI
         if let Some(new_msg) = Q_CMD.dequeue() {
@@ -171,13 +173,13 @@ where
         // if let Err(_) = Q_MSG.enqueue(UIMsg::Battery(bat_val)) {
         //     error!("Failed to enqueue new Battery info message");
         // }
-        if imu.available(){
-            let angles = imu.get_angles();
-            let imu_msg = ImuInfo {roll:angles.get_roll(), pitch:angles.get_pitch()};
-            if let Err(_) = Q_MSG.enqueue(UIMsg::IMU(imu_msg)){
-                error!("Failed to enqueue imu message");
-            }
-        }
+        // if imu.available(){
+        //     let angles = imu.get_angles();
+        //     let imu_msg = ImuInfo {roll:angles.get_roll(), pitch:angles.get_pitch()};
+        //     if let Err(_) = Q_MSG.enqueue(UIMsg::IMU(imu_msg)){
+        //         error!("Failed to enqueue imu message");
+        //     }
+        // }
         // roll += 0.01;
         // pitch += 0.01;
         // if roll >= 10.0 && pitch >= 10.0 {
@@ -261,6 +263,17 @@ fn main() -> ! {
     let i2c: &'static _ = shared_bus::new_cortexm!(I2C<rp_pico::pac::I2C0, (gpio::Pin<gpio::bank0::Gpio4, gpio::FunctionI2c, gpio::PullUp>, gpio::Pin<gpio::bank0::Gpio5, gpio::FunctionI2c, gpio::PullUp>)> = i2c).unwrap();
     // let i2c = shared_bus::CortexMMutex::new(i2c); 
 
+    // UART
+    info!("Setting up uart for modbus rtu");
+    let tx_pin: gpio::Pin<_, gpio::FunctionUart, gpio::PullDown> = pins.gpio0.reconfigure();
+    let rx_pin: gpio::Pin<_, gpio::FunctionUart, gpio::PullDown> = pins.gpio1.reconfigure();
+    // let uart = rp2040_hal::
+    let uart = UartPeripheral::new(pac.UART0, (tx_pin, rx_pin), &mut pac.RESETS)
+    .enable(
+        UartConfig::new(9600.Hz(), DataBits::Eight, None, StopBits::One),
+        clocks.peripheral_clock.freq(),
+    ).unwrap();
+    
     info!("Setting up Display");
     let mut bl = pins.gpio6.into_push_pull_output_in_state(PinState::High);
     // bl.set_high().unwrap();
@@ -320,7 +333,7 @@ fn main() -> ! {
             error!("Failed to enqueue newest UI message");
         }
     });
-    let _test = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || core1_task(5, delay, i2c));
+    let _test = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || core1_task(5, delay, i2c, uart));
 
     let mut last_touch = None;
     info!("Starting Loop!");
