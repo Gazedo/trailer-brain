@@ -28,13 +28,6 @@ use rp_pico::{
     pac::{CorePeripherals, Peripherals},
 };
 use shared_bus::BusManagerCortexM;
-use slint::{
-    platform::{
-        software_renderer::{MinimalSoftwareWindow, RepaintBufferType},
-        WindowEvent,
-    },
-    ComponentHandle,
-};
 
 use crate::{
     pico_slint::PicoPlatform,
@@ -118,13 +111,6 @@ where
                         if let Err(_) = pins.p14.set_state(PinState::from(val)){
                             error!("Unable to set kitchen");
                         }
-                        // let bits = match val{
-                        //     true => 0x00,
-                        //     false => 0xff,
-                        // };
-                        // if let Err(e) = expander.set(bits){
-                        //     error!("Failed to set expander bits")
-                        // }
                     }
                     Output::Stove => {
                         info!("Got toggle message for Stove with val {}", val);
